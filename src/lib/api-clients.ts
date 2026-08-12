@@ -695,13 +695,15 @@ export class DHLClient {
     declaredValue?: number;
     declaredCurrency?: string;
     description?: string;
-    labelFormat?: 'pdf' | 'zpl';
+    labelFormat?: 'pdf' | 'zpl' | 'PDF' | 'ZPL';
   }): Promise<any> {
     const url = `${this.getProxyUrl()}${this.baseUrl}/shipments`;
     
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const plannedShippingDateAndTime = tomorrow.toISOString().replace(/\.\d{3}Z$/, 'GMT+00:00');
+
+    const formatUpper = (params.labelFormat || 'PDF').toUpperCase();
 
     const body: any = {
       plannedShippingDateAndTime,
@@ -719,9 +721,9 @@ export class DHLClient {
         imageOptions: [
           {
             typeCode: 'label',
-            templateName: params.labelFormat === 'zpl' ? 'ECOM26_84_001' : 'ECOM26_84_A4_001',
+            templateName: formatUpper === 'ZPL' ? 'ECOM26_84_001' : 'ECOM26_84_A4_001',
             isRequested: true,
-            encodingFormat: params.labelFormat || 'pdf'
+            encodingFormat: formatUpper
           }
         ]
       },
