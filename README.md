@@ -1,11 +1,6 @@
-<div align="center">
+# Disclaimer
+**Not Affiliated with FedEx:** This software is an independent project and is not provided, endorsed, or supported by FedEx or UPS.
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+**Use at Your Own Risk:** This application is provided "as is" without warranty of any kind. As the user, you assume full responsibility for your use of the FedEx/UPS API and compliance with the FedEx/UPS End User License Agreement (EULA). The developer of this software is not liable for any damages, including but not limited to lost profits, data loss, or service interruptions.
 
-  <h1>Built with AI Studio</h2>
-
-  <p>The fastest path from prompt to production with Gemini.</p>
-
-  <a href="https://aistudio.google.com/apps">Start building</a>
-
-</div>
+**Compliance:** Users are responsible for ensuring they have a valid FedEx/UPS account and are adhering to all FedEx/UPS terms of service, including technical requiremea privacy obligations. All FedEx/UPS trademarks and proprietary "Materials" are the property of FedEx/UPS.
