@@ -715,11 +715,11 @@ export class DHLClient {
           number: this.accountNumber.trim()
         }
       ] : [],
-      outputImageOptions: {
+      outputImageProperties: {
         imageOptions: [
           {
             typeCode: 'label',
-            templateName: 'ECOM26_84_A4_001',
+            templateName: params.labelFormat === 'zpl' ? 'ECOM26_84_001' : 'ECOM26_84_A4_001',
             isRequested: true,
             encodingFormat: params.labelFormat || 'pdf'
           }
