@@ -703,7 +703,7 @@ export class DHLClient {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const plannedShippingDateAndTime = tomorrow.toISOString().replace(/\.\d{3}Z$/, 'GMT+00:00');
 
-    const formatUpper = (params.labelFormat || 'PDF').toUpperCase();
+    const isZpl = (params.labelFormat || '').toLowerCase() === 'zpl';
 
     const body: any = {
       plannedShippingDateAndTime,
@@ -718,12 +718,12 @@ export class DHLClient {
         }
       ] : [],
       outputImageProperties: {
+        encodingFormat: isZpl ? 'zpl' : 'pdf',
         imageOptions: [
           {
             typeCode: 'label',
-            templateName: formatUpper === 'ZPL' ? 'ECOM26_84_001' : 'ECOM26_84_A4_001',
-            isRequested: true,
-            encodingFormat: formatUpper
+            templateName: isZpl ? 'ECOM26_84_001' : 'ECOM26_84_A4_001',
+            isRequested: true
           }
         ]
       },
