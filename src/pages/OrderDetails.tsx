@@ -11,7 +11,7 @@ import { Package, Truck, MapPin, User, ArrowLeft, Loader2, Printer, CheckCircle2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { MagentoOrder, FedExClient, MagentoClient } from '@/src/lib/api-clients';
+import { MagentoOrder, FedExClient, DHLClient, MagentoClient } from '@/src/lib/api-clients';
 import { SawyerCredentials, AddressBookCustomer, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
 import { PDFDocument } from 'pdf-lib';
 import { COUNTRY_NAMES, getCountryCode } from '@/src/lib/countries';
@@ -955,6 +955,77 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         }
       }
 
+      // 3. Fetch DHL Express Rates if enabled and credentials exist
+      const dhlCreds = credentials.dhl;
+      const hasDhlCreds = dhlCreds?.isSandbox 
+        ? (dhlCreds?.sandboxApiKey && dhlCreds?.sandboxApiSecret) 
+        : (dhlCreds?.productionApiKey && dhlCreds?.productionApiSecret);
+
+      if (dhlCreds?.enabled && hasDhlCreds) {
+        try {
+          const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+          const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+          const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
+
+          const dhl = new DHLClient(
+            apiKey,
+            apiSecret,
+            accountNumber,
+            dhlCreds.isSandbox,
+            credentials.general.proxyUrl
+          );
+
+          console.log("[DHLClient] Fetching rates...");
+          const dhlData = await dhl.getRates({
+            shipper: {
+              postalCode: credentials.general.originPostalCode,
+              cityName: credentials.general.originCity,
+              countryCode: getCarrierCountryCode(credentials.general.originCountry),
+              addressLine1: credentials.general.originStreet1
+            },
+            receiver: {
+              postalCode: order.shipping_address.postcode,
+              cityName: order.shipping_address.city,
+              countryCode: getCarrierCountryCode(order.shipping_address.country_id),
+              addressLine1: order.shipping_address.street?.[0] || 'Address Line 1'
+            },
+            packages: pacakgeConfigs.map(p => ({
+              weight: parseFloat(p.weight) || 0.5,
+              length: Math.max(1, parseFloat(p.length) || 10),
+              width: Math.max(1, parseFloat(p.width) || 10),
+              height: Math.max(1, parseFloat(p.height) || 10)
+            })),
+            currency: credentials.general.currency || 'GBP'
+          });
+
+          if (dhlData?.products) {
+            dhlData.products.forEach((prod: any) => {
+              const price = prod.totalPrice?.[0]?.price || prod.detailedPriceBreakdown?.[0]?.price || 0;
+              let deliveryInfo = 'DHL Express Live Rate';
+              if (prod.deliveryCapabilities?.estimatedDeliveryDateAndTime) {
+                try {
+                  const d = new Date(prod.deliveryCapabilities.estimatedDeliveryDateAndTime);
+                  deliveryInfo = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                } catch (e) {
+                  deliveryInfo = prod.deliveryCapabilities.estimatedDeliveryDateAndTime;
+                }
+              }
+
+              allRates.push({
+                id: `dhl-${prod.productCode}`,
+                carrier: 'DHL Express',
+                service: prod.productName || `DHL Express (${prod.productCode})`,
+                price: Number(price),
+                delivery: deliveryInfo
+              });
+            });
+          }
+        } catch (e: any) {
+          console.error("DHL Rate Error:", e);
+          toast.error("DHL Express Rate Error", { description: e?.message || "Failed to fetch rates from DHL." });
+        }
+      }
+
       // Update rates state
       setRates(allRates.sort((a, b) => a.price - b.price));
       
@@ -1192,6 +1263,72 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
           const error = fedexData.errors?.[0] || { message: "FedEx Shipment Failed" };
           throw new Error(error.message);
         }
+      } else if (selectedRate.carrier === 'DHL Express' || selectedRate.carrier === 'DHL') {
+        const dhlCreds = credentials.dhl;
+        const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+        const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+        const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
+
+        const dhl = new DHLClient(
+          apiKey,
+          apiSecret,
+          accountNumber,
+          dhlCreds.isSandbox,
+          credentials.general.proxyUrl
+        );
+
+        const productCode = selectedRate.id.replace('dhl-', '');
+
+        const dhlShipmentParams = {
+          productCode: productCode || 'P',
+          shipper: {
+            name: credentials.general.originContactName || 'Shipper',
+            company: credentials.general.originCompanyName || 'Shipper',
+            phone: credentials.general.originPhone || '+1234567890',
+            email: credentials.general.originEmail || 'shipper@example.com',
+            street1: credentials.general.originStreet1,
+            street2: credentials.general.originStreet2,
+            city: credentials.general.originCity,
+            region: credentials.general.originState,
+            postalCode: credentials.general.originPostalCode,
+            countryCode: getCarrierCountryCode(credentials.general.originCountry)
+          },
+          receiver: {
+            name: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
+            company: order.shipping_address?.company,
+            phone: order.shipping_address?.telephone || '+1234567890',
+            email: order.customer_email || 'customer@example.com',
+            street1: order.shipping_address?.street?.[0] || 'Street 1',
+            street2: order.shipping_address?.street?.[1] || '',
+            city: order.shipping_address?.city || '',
+            region: order.shipping_address?.region,
+            postalCode: order.shipping_address?.postcode || '',
+            countryCode: getCarrierCountryCode(order.shipping_address?.country_id)
+          },
+          packages: pacakgeConfigs.map((p, idx) => ({
+            weight: parseFloat(p.weight) || 0.5,
+            length: Math.max(1, parseFloat(p.length) || 10),
+            width: Math.max(1, parseFloat(p.width) || 10),
+            height: Math.max(1, parseFloat(p.height) || 10),
+            reference: order.increment_id
+          })),
+          currency: credentials.general.currency || 'GBP',
+          description: order.items?.map(i => i.name).join(', ').substring(0, 70) || 'Package Contents',
+          labelFormat: (credentials.general.labelFormat === 'ZPL' ? 'zpl' : 'pdf') as 'pdf' | 'zpl'
+        };
+
+        console.log("[DHLClient] Creating shipment...", dhlShipmentParams);
+        const dhlData = await dhl.createShipment(dhlShipmentParams);
+
+        tracking = dhlData.shipmentTrackingNumber || dhlData.packages?.[0]?.trackingNumber || `DHL-${Date.now()}`;
+        labelType = credentials.general.labelFormat === 'ZPL' ? 'text/plain' : 'application/pdf';
+
+        const documents = dhlData.documents || [];
+        const labelDoc = documents.find((doc: any) => doc.typeCode === 'label') || documents[0];
+
+        if (labelDoc?.content) {
+          labelBase64 = labelDoc.content;
+        }
       }
 
       if (tracking) {
@@ -1252,8 +1389,8 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
             // "Smart Replace": if order is already complete, it means there is an existing shipment.
             // We should ideally just add the new track to an existing shipment if we can't create a new one.
-            const carrierTitle = 'Federal Express';
-            const carrierCode = selectedRate.carrier.toLowerCase();
+            const carrierTitle = selectedRate.carrier === 'DHL Express' || selectedRate.carrier === 'DHL' ? 'DHL Express' : 'Federal Express';
+            const carrierCode = selectedRate.carrier.toLowerCase().includes('dhl') ? 'dhl' : 'fedex';
             const trackObj = {
               track_number: tracking,
               title: carrierTitle,
@@ -1331,7 +1468,7 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
               id: `${tracking}-${Date.now()}`,
               orderIncrementId: order.increment_id || 'MANUAL',
               trackingNumber: tracking,
-              carrier: 'FedEx',
+              carrier: (selectedRate.carrier === 'DHL Express' || selectedRate.carrier === 'DHL') ? 'DHL Express' : 'FedEx',
               service: selectedRate.service,
               customerName: `${order.shipping_address?.firstname} ${order.shipping_address?.lastname}`,
               company: order.shipping_address?.company || '',

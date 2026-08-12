@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Truck, Search, ExternalLink, RotateCcw, ChevronLeft, ChevronRight, Loader2, Calendar, AlertCircle, MoreVertical, Trash2, Ban, FileText, MapPin, User, Package, CreditCard, Printer, Eye } from 'lucide-react';
 import { SawyerCredentials, SawyerShipment } from '@/src/hooks/use-sawyer-storage';
-import { FedExClient, MagentoClient } from '@/src/lib/api-clients';
+import { FedExClient, DHLClient, MagentoClient } from '@/src/lib/api-clients';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -109,6 +109,9 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
   );
 
   const getTrackingUrl = (carrier: string, trackingNumber: string) => {
+    if (carrier.toLowerCase().includes('dhl')) {
+      return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`;
+    }
     return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
   };
 
@@ -121,7 +124,25 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
     try {
       let newStatus = shipment.status || 'Unknown';
       
-      if (shipment.carrier === 'FedEx') {
+      if (shipment.carrier === 'DHL Express' || shipment.carrier === 'DHL') {
+        const dhlCreds = credentials.dhl;
+        const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+        const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+        const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
+
+        if (apiKey && apiSecret) {
+          const client = new DHLClient(
+            apiKey,
+            apiSecret,
+            accountNumber,
+            dhlCreds.isSandbox,
+            credentials.general.proxyUrl
+          );
+          const data = await client.trackShipment(shipment.trackingNumber);
+          const trackInfo = data?.shipments?.[0] || data;
+          newStatus = trackInfo?.status?.description || trackInfo?.status?.statusCode || 'Active';
+        }
+      } else if (shipment.carrier === 'FedEx') {
         const isTrackingSandbox = credentials.fedex.isTrackingSandbox;
         const accountNumber = isTrackingSandbox
           ? (credentials.fedex.sandboxTrackingAccountNumber || credentials.fedex.accountNumber)

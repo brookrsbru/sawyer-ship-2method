@@ -193,6 +193,7 @@ export default function Settings({
                     { id: 'shipping', label: 'Shipping Defaults', icon: Truck },
                     { id: 'magento', label: 'Magento Integration', icon: Globe },
                     { id: 'fedex', label: 'FedEx Integration', icon: Truck },
+                    { id: 'dhl', label: 'DHL Express Integration', icon: Truck },
                     { id: 'security', label: 'Security & Backup', icon: Shield },
                     { id: 'dev', label: 'Dev Menu', icon: FileJson },
                     { id: 'help', label: 'Help Desk', icon: Info },
@@ -1229,6 +1230,162 @@ export default function Settings({
                               <SelectItem value="production">Production (Live)</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* DHL Express Section */}
+            <section id="dhl" className="scroll-mt-6 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">DHL Express Integration</h2>
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck size={20} className="text-yellow-600" /> DHL Express MYDHL API
+                    </CardTitle>
+                    <CardDescription>MYDHL Express REST API credentials.</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="dhl-enabled" className="text-xs">Enabled</Label>
+                    <Select 
+                      value={formData.dhl?.enabled ? "yes" : "no"}
+                      onValueChange={(v) => setFormData({ ...formData, dhl: { ...formData.dhl, enabled: v === "yes" } })}
+                    >
+                      <SelectTrigger id="dhl-enabled" className="w-[80px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  {/* Mode / Environment */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                      <SettingsIcon size={16} className="text-zinc-400" />
+                      Environment & Account
+                    </h3>
+                    <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="dhl-env">Environment</Label>
+                          <Select 
+                            value={formData.dhl?.isSandbox ? "sandbox" : "production"}
+                            onValueChange={(v) => setFormData({ ...formData, dhl: { ...formData.dhl, isSandbox: v === "sandbox" } })}
+                          >
+                            <SelectTrigger id="dhl-env">
+                              <SelectValue placeholder="Select environment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sandbox">Sandbox / Test</SelectItem>
+                              <SelectItem value="production">Production (Live)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dhl-account">DHL Express Account Number</Label>
+                          <Input 
+                            id="dhl-account" 
+                            placeholder="e.g. 123456789"
+                            value={formData.dhl?.isSandbox ? (formData.dhl?.sandboxAccountNumber || '') : (formData.dhl?.productionAccountNumber || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (formData.dhl?.isSandbox) {
+                                setFormData({ ...formData, dhl: { ...formData.dhl, sandboxAccountNumber: val, accountNumber: val } });
+                              } else {
+                                setFormData({ ...formData, dhl: { ...formData.dhl, productionAccountNumber: val, accountNumber: val } });
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* API Credentials */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+                      <Lock size={16} className="text-zinc-400" />
+                      MYDHL API Credentials
+                    </h3>
+                    <div className="space-y-4 pl-6 border-l-2 border-zinc-100">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Sandbox Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-sandbox-key">API Key (Site ID)</Label>
+                            <Input 
+                              id="dhl-sandbox-key" 
+                              placeholder="Sandbox API Key"
+                              value={formData.dhl?.sandboxApiKey || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, sandboxApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-sandbox-secret">API Secret (Password)</Label>
+                            <Input 
+                              id="dhl-sandbox-secret" 
+                              type="password"
+                              autoComplete="off"
+                              placeholder="Sandbox API Secret"
+                              value={formData.dhl?.sandboxApiSecret || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, sandboxApiSecret: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-sandbox-acc">Sandbox Account Number</Label>
+                            <Input 
+                              id="dhl-sandbox-acc" 
+                              placeholder="Sandbox Account Number"
+                              value={formData.dhl?.sandboxAccountNumber || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, sandboxAccountNumber: e.target.value } })}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Production Credentials</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-production-key">API Key (Site ID)</Label>
+                            <Input 
+                              id="dhl-production-key" 
+                              placeholder="Production API Key"
+                              value={formData.dhl?.productionApiKey || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, productionApiKey: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-production-secret">API Secret (Password)</Label>
+                            <Input 
+                              id="dhl-production-secret" 
+                              type="password"
+                              autoComplete="off"
+                              placeholder="Production API Secret"
+                              value={formData.dhl?.productionApiSecret || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, productionApiSecret: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="dhl-production-acc">Production Account Number</Label>
+                            <Input 
+                              id="dhl-production-acc" 
+                              placeholder="Production Account Number"
+                              value={formData.dhl?.productionAccountNumber || ''}
+                              onChange={(e) => setFormData({ ...formData, dhl: { ...formData.dhl, productionAccountNumber: e.target.value } })}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>

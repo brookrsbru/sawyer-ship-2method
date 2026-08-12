@@ -64,6 +64,19 @@ export interface SawyerCredentials {
     productionAccountNumber: string;
     isSandbox: boolean;
   };
+  dhl: {
+    enabled: boolean;
+    apiKey: string;
+    apiSecret: string;
+    accountNumber: string;
+    sandboxApiKey: string;
+    sandboxApiSecret: string;
+    sandboxAccountNumber: string;
+    productionApiKey: string;
+    productionApiSecret: string;
+    productionAccountNumber: string;
+    isSandbox: boolean;
+  };
   general: {
     proxyUrl: string;
     labelFormat: 'PDF' | 'ZPL';
@@ -97,7 +110,7 @@ export interface SawyerShipment {
   id: string;
   orderIncrementId: string;
   trackingNumber: string;
-  carrier: 'FedEx';
+  carrier: 'FedEx' | 'DHL Express' | 'DHL';
   service: string;
   customerName: string;
   company: string;
@@ -178,6 +191,19 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     paymentAccountNumber: '',
     productionAccountNumber: '',
     isSandbox: true 
+  },
+  dhl: {
+    enabled: false,
+    apiKey: '',
+    apiSecret: '',
+    accountNumber: '',
+    sandboxApiKey: '',
+    sandboxApiSecret: '',
+    sandboxAccountNumber: '',
+    productionApiKey: '',
+    productionApiSecret: '',
+    productionAccountNumber: '',
+    isSandbox: true
   },
   general: { 
     proxyUrl: 'https://cors-anywhere.herokuapp.com/', 
@@ -280,6 +306,7 @@ export function useSawyerStorage() {
         ...parsed,
         magento: { ...DEFAULT_CREDENTIALS.magento, ...(parsed.magento || {}) },
         fedex: { ...DEFAULT_CREDENTIALS.fedex, ...(parsed.fedex || {}) },
+        dhl: { ...DEFAULT_CREDENTIALS.dhl, ...(parsed.dhl || {}) },
         general: { ...DEFAULT_CREDENTIALS.general, ...(parsed.general || {}) },
         shippingDefaults: { ...DEFAULT_CREDENTIALS.shippingDefaults, ...(parsed.shippingDefaults || {}) },
         addressBook: parsed.addressBook || [],

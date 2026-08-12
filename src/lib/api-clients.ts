@@ -552,3 +552,284 @@ export class FedExClient {
     return data;
   }
 }
+
+export class DHLClient {
+  constructor(
+    private apiKey: string,
+    private apiSecret: string,
+    private accountNumber: string,
+    private isSandbox: boolean = true,
+    private proxyUrl: string = ''
+  ) {}
+
+  private get baseUrl() {
+    return this.isSandbox
+      ? 'https://express.api.dhl.com/mydhlapi/test'
+      : 'https://express.api.dhl.com/mydhlapi';
+  }
+
+  private getProxyUrl() {
+    return this.proxyUrl ? (this.proxyUrl.endsWith('/') ? this.proxyUrl : `${this.proxyUrl}/`) : '';
+  }
+
+  private getAuthHeader() {
+    const creds = `${(this.apiKey || '').trim()}:${(this.apiSecret || '').trim()}`;
+    return `Basic ${btoa(creds)}`;
+  }
+
+  async getRates(params: {
+    shipper: { postalCode: string; cityName: string; countryCode: string; addressLine1?: string };
+    receiver: { postalCode: string; cityName: string; countryCode: string; addressLine1?: string };
+    packages: Array<{ weight: number; length: number; width: number; height: number }>;
+    currency?: string;
+    declaredValue?: number;
+    declaredCurrency?: string;
+    isCustomsDeclarable?: boolean;
+  }): Promise<any> {
+    const url = `${this.getProxyUrl()}${this.baseUrl}/rates`;
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const plannedShippingDateAndTime = tomorrow.toISOString().replace(/\.\d{3}Z$/, 'GMT+00:00');
+
+    const body: any = {
+      customerDetails: {
+        shipperDetails: {
+          postalCode: params.shipper.postalCode || '',
+          cityName: params.shipper.cityName || '',
+          countryCode: params.shipper.countryCode || 'GB',
+          addressLine1: params.shipper.addressLine1 || 'Main Street'
+        },
+        receiverDetails: {
+          postalCode: params.receiver.postalCode || '',
+          cityName: params.receiver.cityName || '',
+          countryCode: params.receiver.countryCode || 'GB',
+          addressLine1: params.receiver.addressLine1 || 'Delivery Line'
+        }
+      },
+      plannedShippingDateAndTime,
+      unitOfMeasurement: 'metric',
+      isCustomsDeclarable: params.isCustomsDeclarable ?? (params.shipper.countryCode !== params.receiver.countryCode),
+      packages: params.packages.map((pkg, idx) => ({
+        typeCode: '3BX',
+        weight: Number(pkg.weight) || 0.5,
+        dimensions: {
+          length: Math.max(1, Number(pkg.length) || 10),
+          width: Math.max(1, Number(pkg.width) || 10),
+          height: Math.max(1, Number(pkg.height) || 10),
+        }
+      }))
+    };
+
+    if (this.accountNumber) {
+      body.accounts = [
+        {
+          typeCode: 'shipper',
+          number: this.accountNumber.trim()
+        }
+      ];
+    }
+
+    if (params.declaredValue && params.declaredValue > 0) {
+      body.monetaryAmount = [
+        {
+          typeCode: 'declaredValue',
+          value: Number(params.declaredValue),
+          currency: params.declaredCurrency || params.currency || 'GBP'
+        }
+      ];
+    }
+
+    console.log(`[DHLClient] Requesting rates from ${url}`, body);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.getAuthHeader(),
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const msg = data.detail || data.title || data.message || (data.warnings?.[0]?.detail) || `DHL Rates Error: ${response.status}`;
+      console.error(`[DHLClient] Rates failed (${response.status}):`, data);
+      throw new Error(`DHL Express Error (${response.status}): ${msg}`);
+    }
+
+    console.log(`[DHLClient] Rates response:`, data);
+    return data;
+  }
+
+  async createShipment(params: {
+    productCode: string;
+    shipper: {
+      name: string;
+      company: string;
+      phone: string;
+      email: string;
+      street1: string;
+      street2?: string;
+      city: string;
+      region?: string;
+      postalCode: string;
+      countryCode: string;
+    };
+    receiver: {
+      name: string;
+      company?: string;
+      phone: string;
+      email?: string;
+      street1: string;
+      street2?: string;
+      city: string;
+      region?: string;
+      postalCode: string;
+      countryCode: string;
+    };
+    packages: Array<{ weight: number; length: number; width: number; height: number; reference?: string }>;
+    currency?: string;
+    declaredValue?: number;
+    declaredCurrency?: string;
+    description?: string;
+    labelFormat?: 'pdf' | 'zpl';
+  }): Promise<any> {
+    const url = `${this.getProxyUrl()}${this.baseUrl}/shipments`;
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const plannedShippingDateAndTime = tomorrow.toISOString().replace(/\.\d{3}Z$/, 'GMT+00:00');
+
+    const body: any = {
+      plannedShippingDateAndTime,
+      pickup: {
+        isRequested: false
+      },
+      productCode: params.productCode || 'P',
+      accounts: this.accountNumber ? [
+        {
+          typeCode: 'shipper',
+          number: this.accountNumber.trim()
+        }
+      ] : [],
+      outputImageOptions: {
+        imageOptions: [
+          {
+            typeCode: 'label',
+            templateName: 'ECOM26_84_A4_001',
+            isRequested: true,
+            encodingFormat: params.labelFormat || 'pdf'
+          }
+        ]
+      },
+      customerDetails: {
+        shipperDetails: {
+          postalAddress: {
+            postalCode: params.shipper.postalCode,
+            cityName: params.shipper.city,
+            countryCode: params.shipper.countryCode,
+            addressLine1: params.shipper.street1,
+            ...(params.shipper.street2 ? { addressLine2: params.shipper.street2 } : {}),
+            ...(params.shipper.region ? { provinceCode: params.shipper.region } : {})
+          },
+          contactInformation: {
+            email: params.shipper.email || 'shipper@example.com',
+            phone: params.shipper.phone || '+1234567890',
+            companyName: params.shipper.company || params.shipper.name || 'Shipper',
+            fullName: params.shipper.name || 'Shipper'
+          }
+        },
+        receiverDetails: {
+          postalAddress: {
+            postalCode: params.receiver.postalCode,
+            cityName: params.receiver.city,
+            countryCode: params.receiver.countryCode,
+            addressLine1: params.receiver.street1,
+            ...(params.receiver.street2 ? { addressLine2: params.receiver.street2 } : {}),
+            ...(params.receiver.region ? { provinceCode: params.receiver.region } : {})
+          },
+          contactInformation: {
+            email: params.receiver.email || 'customer@example.com',
+            phone: params.receiver.phone || '+1234567890',
+            companyName: params.receiver.company || params.receiver.name || 'Customer',
+            fullName: params.receiver.name || 'Customer'
+          }
+        }
+      },
+      content: {
+        packages: params.packages.map((pkg, idx) => ({
+          typeCode: '3BX',
+          weight: Number(pkg.weight) || 0.5,
+          dimensions: {
+            length: Math.max(1, Number(pkg.length) || 10),
+            width: Math.max(1, Number(pkg.width) || 10),
+            height: Math.max(1, Number(pkg.height) || 10),
+          },
+          customerReferences: [
+            {
+              value: pkg.reference || `PKG-${idx + 1}`,
+              typeCode: 'CU'
+            }
+          ]
+        })),
+        isCustomsDeclarable: params.shipper.countryCode !== params.receiver.countryCode,
+        description: params.description || 'Goods Shipment',
+        unitOfMeasurement: 'metric'
+      }
+    };
+
+    if (params.declaredValue && params.declaredValue > 0) {
+      body.content.declaredValue = Number(params.declaredValue);
+      body.content.declaredValueCurrency = params.declaredCurrency || params.currency || 'GBP';
+    }
+
+    console.log(`[DHLClient] Creating shipment via ${url}`, body);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.getAuthHeader(),
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const msg = data.detail || data.title || data.message || `DHL Create Shipment Error: ${response.status}`;
+      console.error(`[DHLClient] Shipment error (${response.status}):`, data);
+      throw new Error(`DHL Express Error (${response.status}): ${msg}`);
+    }
+
+    console.log(`[DHLClient] Shipment created response:`, data);
+    return data;
+  }
+
+  async trackShipment(trackingNumber: string): Promise<any> {
+    console.log(`[DHLClient] Tracking shipment: ${trackingNumber}`);
+    const url = `${this.getProxyUrl()}${this.baseUrl}/shipments/${encodeURIComponent(trackingNumber)}/tracking`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': this.getAuthHeader(),
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const msg = data.detail || data.title || data.message || `DHL Track Error: ${response.status}`;
+      throw new Error(`DHL Express Track Error (${response.status}): ${msg}`);
+    }
+
+    console.log(`[DHLClient] Tracking response:`, data);
+    return data;
+  }
+}
