@@ -126,26 +126,16 @@ export default function Tracking({ credentials, onSave }: { credentials: SawyerC
       
       if (shipment.carrier === 'DHL Express' || shipment.carrier === 'DHL') {
         const dhlCreds = credentials.dhl;
-        const isTrackingSandbox = dhlCreds?.isTrackingSandbox !== undefined ? dhlCreds.isTrackingSandbox : (dhlCreds?.isSandbox ?? true);
-
-        const apiKey = isTrackingSandbox 
-          ? (dhlCreds?.sandboxTrackingApiKey || dhlCreds?.sandboxApiKey || dhlCreds?.apiKey)
-          : (dhlCreds?.productionTrackingApiKey || dhlCreds?.productionApiKey || dhlCreds?.apiKey);
-
-        const apiSecret = isTrackingSandbox
-          ? (dhlCreds?.sandboxTrackingApiSecret || dhlCreds?.sandboxApiSecret || dhlCreds?.apiSecret)
-          : (dhlCreds?.productionTrackingApiSecret || dhlCreds?.productionApiSecret || dhlCreds?.apiSecret);
-
-        const accountNumber = isTrackingSandbox
-          ? (dhlCreds?.sandboxTrackingAccountNumber || dhlCreds?.sandboxAccountNumber || dhlCreds?.accountNumber)
-          : (dhlCreds?.productionTrackingAccountNumber || dhlCreds?.productionAccountNumber || dhlCreds?.accountNumber);
+        const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+        const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+        const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
 
         if (apiKey && apiSecret) {
           const client = new DHLClient(
             apiKey,
             apiSecret,
             accountNumber,
-            isTrackingSandbox,
+            dhlCreds.isSandbox,
             credentials.general.proxyUrl
           );
           const data = await client.trackShipment(shipment.trackingNumber);

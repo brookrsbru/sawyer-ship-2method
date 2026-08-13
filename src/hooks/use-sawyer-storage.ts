@@ -76,14 +76,6 @@ export interface SawyerCredentials {
     productionApiSecret: string;
     productionAccountNumber: string;
     isSandbox: boolean;
-    // Separate Tracking Credentials
-    sandboxTrackingApiKey: string;
-    sandboxTrackingApiSecret: string;
-    sandboxTrackingAccountNumber: string;
-    productionTrackingApiKey: string;
-    productionTrackingApiSecret: string;
-    productionTrackingAccountNumber: string;
-    isTrackingSandbox: boolean;
   };
   general: {
     proxyUrl: string;
@@ -211,14 +203,7 @@ const DEFAULT_CREDENTIALS: SawyerCredentials = {
     productionApiKey: '',
     productionApiSecret: '',
     productionAccountNumber: '',
-    isSandbox: true,
-    sandboxTrackingApiKey: '',
-    sandboxTrackingApiSecret: '',
-    sandboxTrackingAccountNumber: '',
-    productionTrackingApiKey: '',
-    productionTrackingApiSecret: '',
-    productionTrackingAccountNumber: '',
-    isTrackingSandbox: true
+    isSandbox: true
   },
   general: { 
     proxyUrl: 'https://cors-anywhere.herokuapp.com/', 

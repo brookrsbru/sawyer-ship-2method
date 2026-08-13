@@ -957,24 +957,20 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
 
       // 3. Fetch DHL Express Rates if enabled and credentials exist
       const dhlCreds = credentials.dhl;
-      const dhlApiKey = dhlCreds?.isSandbox 
-        ? (dhlCreds?.sandboxApiKey || dhlCreds?.apiKey) 
-        : (dhlCreds?.productionApiKey || dhlCreds?.apiKey);
-      const dhlApiSecret = dhlCreds?.isSandbox 
-        ? (dhlCreds?.sandboxApiSecret || dhlCreds?.apiSecret) 
-        : (dhlCreds?.productionApiSecret || dhlCreds?.apiSecret);
-      const dhlAccountNumber = dhlCreds?.isSandbox 
-        ? (dhlCreds?.sandboxAccountNumber || dhlCreds?.accountNumber) 
-        : (dhlCreds?.productionAccountNumber || dhlCreds?.accountNumber);
-
-      const hasDhlCreds = !!(dhlApiKey && dhlApiSecret);
+      const hasDhlCreds = dhlCreds?.isSandbox 
+        ? (dhlCreds?.sandboxApiKey && dhlCreds?.sandboxApiSecret) 
+        : (dhlCreds?.productionApiKey && dhlCreds?.productionApiSecret);
 
       if (dhlCreds?.enabled && hasDhlCreds) {
         try {
+          const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+          const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+          const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
+
           const dhl = new DHLClient(
-            dhlApiKey,
-            dhlApiSecret,
-            dhlAccountNumber,
+            apiKey,
+            apiSecret,
+            accountNumber,
             dhlCreds.isSandbox,
             credentials.general.proxyUrl
           );
@@ -1269,15 +1265,9 @@ export default function OrderDetails({ credentials, onSave }: { credentials: Saw
         }
       } else if (selectedRate.carrier === 'DHL Express' || selectedRate.carrier === 'DHL') {
         const dhlCreds = credentials.dhl;
-        const apiKey = dhlCreds.isSandbox 
-          ? (dhlCreds.sandboxApiKey || dhlCreds.apiKey) 
-          : (dhlCreds.productionApiKey || dhlCreds.apiKey);
-        const apiSecret = dhlCreds.isSandbox 
-          ? (dhlCreds.sandboxApiSecret || dhlCreds.apiSecret) 
-          : (dhlCreds.productionApiSecret || dhlCreds.apiSecret);
-        const accountNumber = dhlCreds.isSandbox 
-          ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) 
-          : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
+        const apiKey = dhlCreds.isSandbox ? dhlCreds.sandboxApiKey : dhlCreds.productionApiKey;
+        const apiSecret = dhlCreds.isSandbox ? dhlCreds.sandboxApiSecret : dhlCreds.productionApiSecret;
+        const accountNumber = dhlCreds.isSandbox ? (dhlCreds.sandboxAccountNumber || dhlCreds.accountNumber) : (dhlCreds.productionAccountNumber || dhlCreds.accountNumber);
 
         const dhl = new DHLClient(
           apiKey,
