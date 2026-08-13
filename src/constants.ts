@@ -1,4 +1,4 @@
-export const APP_VERSION = 'DHL 3.0.6';
+export const APP_VERSION = 'DHL 3.0.7';
 
 // Major Addition
 // .

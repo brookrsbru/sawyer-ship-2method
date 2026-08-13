@@ -577,6 +577,48 @@ export class DHLClient {
     return `Basic ${btoa(creds)}`;
   }
 
+  private getHeaders() {
+    const headers: Record<string, string> = {
+      'Authorization': this.getAuthHeader(),
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
+    const key = (this.apiKey || '').trim();
+    if (key) {
+      headers['x-api-key'] = key;
+      headers['dhl-api-key'] = key;
+    }
+    return headers;
+  }
+
+  private parseDhlError(data: any, status: number, actionName: string): string {
+    let msg = '';
+    if (Array.isArray(data?.reasons) && data.reasons.length > 0) {
+      msg = data.reasons.map((r: any) => r.msg || r.message || (typeof r === 'string' ? r : JSON.stringify(r))).join('; ');
+    } else if (data?.detail) {
+      msg = data.detail;
+    } else if (data?.message) {
+      msg = data.message;
+    } else if (data?.title && data.title !== 'Bad Request') {
+      msg = data.title;
+    } else if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+      msg = data.warnings.map((w: any) => w.detail || w.message || (typeof w === 'string' ? w : JSON.stringify(w))).join('; ');
+    } else if (Array.isArray(data?.additionalDetails)) {
+      msg = data.additionalDetails.join('; ');
+    }
+
+    if (!msg) {
+      msg = `DHL ${actionName} Error (${status})`;
+    }
+
+    if (msg.toLowerCase().includes('unauthorized') || status === 401) {
+      const envName = this.isSandbox ? 'Sandbox' : 'Production';
+      msg = `Unauthorized (${status}): Your MYDHL ${envName} API Key (Site ID) or API Secret is invalid, expired, or not authorized for the MYDHL ${actionName} API. Please check your credentials in Settings -> MYDHL API Credentials. Note that Production credentials differ from Sandbox credentials.`;
+    }
+
+    return msg;
+  }
+
   async getRates(params: {
     shipper: { postalCode: string; cityName: string; countryCode: string; addressLine1?: string };
     receiver: { postalCode: string; cityName: string; countryCode: string; addressLine1?: string };
@@ -644,18 +686,14 @@ export class DHLClient {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': this.getAuthHeader(),
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: this.getHeaders(),
       body: JSON.stringify(body)
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const msg = data.detail || data.title || data.message || (data.warnings?.[0]?.detail) || `DHL Rates Error: ${response.status}`;
+      const msg = this.parseDhlError(data, response.status, 'Rates');
       console.error(`[DHLClient] Rates failed (${response.status}):`, data);
       throw new Error(`DHL Express Error (${response.status}): ${msg}`);
     }
@@ -792,18 +830,14 @@ export class DHLClient {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': this.getAuthHeader(),
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: this.getHeaders(),
       body: JSON.stringify(body)
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const msg = data.detail || data.title || data.message || `DHL Create Shipment Error: ${response.status}`;
+      const msg = this.parseDhlError(data, response.status, 'Create Shipment');
       console.error(`[DHLClient] Shipment error (${response.status}):`, data);
       throw new Error(`DHL Express Error (${response.status}): ${msg}`);
     }
@@ -820,6 +854,8 @@ export class DHLClient {
       method: 'GET',
       headers: {
         'Authorization': this.getAuthHeader(),
+        'x-api-key': (this.apiKey || '').trim(),
+        'dhl-api-key': (this.apiKey || '').trim(),
         'Accept': 'application/json'
       }
     });
@@ -827,7 +863,7 @@ export class DHLClient {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const msg = data.detail || data.title || data.message || `DHL Track Error: ${response.status}`;
+      const msg = this.parseDhlError(data, response.status, 'Track');
       throw new Error(`DHL Express Track Error (${response.status}): ${msg}`);
     }
 
