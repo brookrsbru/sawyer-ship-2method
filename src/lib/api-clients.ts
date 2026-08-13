@@ -722,7 +722,7 @@ export class DHLClient {
         imageOptions: [
           {
             typeCode: 'label',
-            templateName: 'ECOM26_84_001',
+            templateName: 'ECOM26_64_001',
             isRequested: true
           }
         ]
